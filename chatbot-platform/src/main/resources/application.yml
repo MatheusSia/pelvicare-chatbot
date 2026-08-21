@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: chatbot-platform
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/evolution
+    username: evolution
+    password: evolution
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8081
+
+evolution:
+  url: http://localhost:8080
+  api-key: pelvicare123

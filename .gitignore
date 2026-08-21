@@ -1,0 +1,8 @@
+.env
+
+chatbot-platform/target/
+chatbot-platform/.idea/
+chatbot-platform/*.iml
+
+*.log
+.DS_Store
