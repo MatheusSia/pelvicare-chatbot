@@ -26,8 +26,6 @@ public class ChatbotService {
     private static final Logger log =
             LoggerFactory.getLogger(ChatbotService.class);
 
-    private static final long HUMAN_HANDOFF_EXPIRATION_HOURS = 12;
-
     private final ApplicationStartupTime applicationStartupTime;
     private final EvolutionClient evolutionClient;
     private final ConversationRepository conversationRepository;
@@ -365,70 +363,8 @@ public class ChatbotService {
             Conversation conversation,
             IncomingMessageDTO message
     ) {
-        LocalDateTime handoffAt = conversation.getHumanHandoffAt();
-
-        if (handoffAt == null) {
-            conversation.setState(ConversationState.MAIN_MENU);
-            conversation.setHumanHandoffAt(null);
-            conversation.setHandoffReason(null);
-
-            conversationRepository.save(conversation);
-
-            log.warn(
-                    "Atendimento humano sem data. Reabrindo chatbot para {}",
-                    message.phone()
-            );
-
-            send(
-                    conversation,
-                    message,
-                    getMessage(
-                            message,
-                            MessageCode.MAIN_MENU
-                    )
-            );
-
-            return;
-        }
-
-        LocalDateTime expirationDate = handoffAt.plusHours(
-                HUMAN_HANDOFF_EXPIRATION_HOURS
-        );
-
-        if (LocalDateTime.now().isAfter(expirationDate)) {
-            conversation.setState(ConversationState.MAIN_MENU);
-            conversation.setHumanHandoffAt(null);
-            conversation.setHandoffReason(null);
-
-            conversationRepository.save(conversation);
-
-            log.info(
-                    "Atendimento humano expirado. Reabrindo chatbot para {}",
-                    message.phone()
-            );
-
-            String expiredMessage = getMessage(
-                    message,
-                    MessageCode.HANDOFF_EXPIRED
-            ).replace(
-                    "{{mainMenu}}",
-                    getMessage(
-                            message,
-                            MessageCode.MAIN_MENU
-                    )
-            );
-
-            send(
-                    conversation,
-                    message,
-                    expiredMessage
-            );
-
-            return;
-        }
-
         log.info(
-                "Mensagem ignorada pelo bot porque a conversa está com atendimento humano | telefone={} | nome={} | assunto={}",
+                "Mensagem ignorada pelo bot porque a conversa está em atendimento humano permanente | telefone={} | nome={} | assunto={}",
                 message.phone(),
                 conversation.getName(),
                 conversation.getHandoffReason()
