@@ -9,8 +9,10 @@ import org.springframework.web.client.RestClient;
 import br.com.sia.chatbot.dto.IncomingMessageDTO;
 import br.com.sia.chatbot.integration.evolution.dto.MarkChatUnreadRequest;
 import java.util.Map;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.databind.JsonNode;
 
 @Component
 public class EvolutionClient {
@@ -31,7 +33,7 @@ public class EvolutionClient {
                 .build();
     }
 
-    public void sendText(
+    public Optional<String> sendText(
             String instance,
             String phone,
             String text
@@ -40,14 +42,16 @@ public class EvolutionClient {
                 new SendTextRequest(phone, text);
 
         try {
-            restClient.post()
+            JsonNode response = restClient.post()
                     .uri(
                             "/message/sendText/{instance}",
                             instance
                     )
                     .body(request)
                     .retrieve()
-                    .toBodilessEntity();
+                    .body(JsonNode.class);
+
+            return extractMessageId(response);
 
         } catch (Exception exception) {
             throw new EvolutionCommunicationException(
@@ -58,6 +62,31 @@ public class EvolutionClient {
                     exception
             );
         }
+    }
+
+    private Optional<String> extractMessageId(JsonNode response) {
+        if (response == null || response.isNull() || response.isMissingNode()) {
+            return Optional.empty();
+        }
+
+        String id = response
+                .path("key")
+                .path("id")
+                .asText("");
+
+        if (id.isBlank()) {
+            id = response
+                    .path("data")
+                    .path("key")
+                    .path("id")
+                    .asText("");
+        }
+
+        if (id.isBlank()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(id);
     }
 
     public void markChatAsUnread(

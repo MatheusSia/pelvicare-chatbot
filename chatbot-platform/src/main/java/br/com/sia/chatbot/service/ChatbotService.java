@@ -19,6 +19,7 @@ import br.com.sia.chatbot.flow.MessageCode;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 public class ChatbotService {
@@ -143,6 +144,23 @@ public class ChatbotService {
                 );
 
         if (conversationOptional.isEmpty()) {
+            if (message.fromMe()) {
+                Conversation conversation =
+                        createSilencedConversation(message);
+
+                chatMessageService.saveClinicOutbound(
+                        conversation,
+                        message
+                );
+
+                log.info(
+                        "Conversa silenciada porque a clínica já estava falando | telefone={}",
+                        message.phone()
+                );
+
+                return;
+            }
+
             Conversation conversation =
                     createConversationWithoutSending(message);
 
@@ -165,6 +183,15 @@ public class ChatbotService {
 
         Conversation conversation =
                 conversationOptional.get();
+
+        if (message.fromMe()) {
+            processClinicMessage(
+                    conversation,
+                    message
+            );
+
+            return;
+        }
 
         chatMessageService.saveInbound(
                 conversation,
@@ -303,6 +330,75 @@ public class ChatbotService {
         return conversationRepository.save(conversation);
     }
 
+    private Conversation createSilencedConversation(
+            IncomingMessageDTO message
+    ) {
+        Conversation conversation = new Conversation();
+        conversation.setInstance(message.instance());
+        conversation.setPhone(message.phone());
+        conversation.setName(message.pushName());
+        conversation.setState(ConversationState.HUMAN_HANDOFF);
+        conversation.setHumanHandoffAt(LocalDateTime.now());
+        conversation.setHandoffReason(
+                "Atendimento já em andamento pela clínica"
+        );
+
+        return conversationRepository.save(conversation);
+    }
+
+    private void processClinicMessage(
+            Conversation conversation,
+            IncomingMessageDTO message
+    ) {
+        if (isBotEcho(message)) {
+            log.debug(
+                    "Eco da mensagem do bot ignorado | telefone={} | messageId={}",
+                    message.phone(),
+                    message.messageId()
+            );
+
+            return;
+        }
+
+        chatMessageService.saveClinicOutbound(
+                conversation,
+                message
+        );
+
+        if (conversation.getState()
+                == ConversationState.HUMAN_HANDOFF) {
+            return;
+        }
+
+        silenceConversation(
+                conversation,
+                "Intervenção da clínica no WhatsApp"
+        );
+
+        log.info(
+                "Bot encerrado porque a clínica enviou mensagem nesta conversa | telefone={}",
+                message.phone()
+        );
+    }
+
+    private boolean isBotEcho(IncomingMessageDTO message) {
+        return chatbotMessageService.matchesStoredContent(
+                message.instance(),
+                message.text()
+        );
+    }
+
+    private void silenceConversation(
+            Conversation conversation,
+            String reason
+    ) {
+        conversation.setState(ConversationState.HUMAN_HANDOFF);
+        conversation.setHumanHandoffAt(LocalDateTime.now());
+        conversation.setHandoffReason(reason);
+
+        conversationRepository.save(conversation);
+    }
+
     private boolean registerMessageIfNew(
             IncomingMessageDTO message
     ) {
@@ -349,6 +445,36 @@ public class ChatbotService {
         }
     }
 
+    private void registerProcessedMessageId(
+            String instance,
+            String messageId
+    ) {
+        if (messageId == null || messageId.isBlank()) {
+            return;
+        }
+
+        if (processedMessageRepository.existsByInstanceAndMessageId(
+                instance,
+                messageId
+        )) {
+            return;
+        }
+
+        ProcessedMessage processedMessage =
+                new ProcessedMessage();
+
+        processedMessage.setInstance(instance);
+        processedMessage.setMessageId(messageId);
+        processedMessage.setProcessedAt(Instant.now());
+
+        try {
+            processedMessageRepository.saveAndFlush(
+                    processedMessage
+            );
+        } catch (DataIntegrityViolationException ignored) {
+        }
+    }
+
     private String getMessage(
             IncomingMessageDTO incomingMessage,
             String code
@@ -390,6 +516,24 @@ public class ChatbotService {
                     getMessage(
                             message,
                             MessageCode.MAIN_MENU
+                    )
+            );
+
+            return;
+        }
+
+        if (text.equals("2")) {
+            silenceConversation(
+                    conversation,
+                    "Cliente recusou o atendimento automático"
+            );
+
+            send(
+                    conversation,
+                    message,
+                    getMessage(
+                            message,
+                            MessageCode.BOT_STOPPED
                     )
             );
 
@@ -645,11 +789,21 @@ public class ChatbotService {
             String text
     ) {
         try {
-            evolutionClient.sendText(
-                    message.instance(),
-                    message.phone(),
-                    text
-            );
+            Optional<String> outboundMessageId =
+                    evolutionClient.sendText(
+                            message.instance(),
+                            message.phone(),
+                            text
+                    );
+
+            if (outboundMessageId != null) {
+                outboundMessageId.ifPresent(
+                        id -> registerProcessedMessageId(
+                                message.instance(),
+                                id
+                        )
+                );
+            }
 
             chatMessageService.saveOutbound(
                     conversation,

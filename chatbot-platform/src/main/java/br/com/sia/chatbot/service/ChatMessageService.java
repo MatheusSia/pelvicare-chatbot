@@ -56,6 +56,38 @@ public class ChatMessageService {
     }
 
     @Transactional
+    public void saveClinicOutbound(
+            Conversation conversation,
+            IncomingMessageDTO message
+    ) {
+        boolean alreadyExists =
+                repository.existsByInstanceAndMessageIdAndDirection(
+                        message.instance(),
+                        message.messageId(),
+                        MessageDirection.OUTBOUND
+                );
+
+        if (alreadyExists) {
+            return;
+        }
+
+        ChatMessage chatMessage = new ChatMessage();
+        chatMessage.setConversation(conversation);
+        chatMessage.setInstance(message.instance());
+        chatMessage.setMessageId(message.messageId());
+        chatMessage.setDirection(MessageDirection.OUTBOUND);
+        chatMessage.setContent(message.text());
+        chatMessage.setSenderName("Clínica");
+        chatMessage.setCreatedAt(
+                message.sentAt() != null
+                        ? message.sentAt()
+                        : Instant.now()
+        );
+
+        repository.save(chatMessage);
+    }
+
+    @Transactional
     public void saveOutbound(
             Conversation conversation,
             String instance,

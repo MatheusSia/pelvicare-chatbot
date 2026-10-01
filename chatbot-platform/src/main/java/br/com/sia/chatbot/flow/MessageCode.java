@@ -7,6 +7,7 @@ public final class MessageCode {
 
     public static final String LGPD = "LGPD";
     public static final String LGPD_RETRY = "LGPD_RETRY";
+    public static final String BOT_STOPPED = "BOT_STOPPED";
     public static final String MAIN_MENU = "MAIN_MENU";
     public static final String TREATMENTS = "TREATMENTS";
     public static final String HEALTH_PLANS = "HEALTH_PLANS";

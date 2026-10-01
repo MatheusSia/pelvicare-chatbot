@@ -64,6 +64,7 @@ class EvolutionMessageParserTest {
         assertEquals("Olá", message.text());
         assertEquals("MESSAGE-123", message.messageId());
         assertEquals(IncomingMessageType.TEXT, message.type());
+        assertFalse(message.fromMe());
         assertEquals(
                 Instant.ofEpochSecond(1785247200),
                 message.sentAt()
@@ -71,7 +72,7 @@ class EvolutionMessageParserTest {
     }
 
     @Test
-    void shouldIgnoreMessageSentByConnectedNumber()
+    void shouldParseMessageSentByConnectedNumber()
             throws Exception {
 
         JsonNode data = objectMapper.readTree(
@@ -83,7 +84,7 @@ class EvolutionMessageParserTest {
                     "id": "MESSAGE-123"
                   },
                   "message": {
-                    "conversation": "Mensagem enviada pelo bot"
+                    "conversation": "2"
                   },
                   "messageType": "conversation",
                   "messageTimestamp": 1785247200
@@ -101,7 +102,14 @@ class EvolutionMessageParserTest {
         Optional<IncomingMessageDTO> result =
                 parser.parse(webhook);
 
-        assertTrue(result.isEmpty());
+        assertTrue(result.isPresent());
+
+        IncomingMessageDTO message = result.get();
+
+        assertTrue(message.fromMe());
+        assertEquals("5519999999999", message.phone());
+        assertEquals("2", message.text());
+        assertEquals(IncomingMessageType.TEXT, message.type());
     }
 
     @Test

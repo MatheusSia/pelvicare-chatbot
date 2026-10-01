@@ -34,4 +34,20 @@ public class ChatbotMessageService {
                         )
                 );
     }
+
+    @Transactional(readOnly = true)
+    public boolean matchesStoredContent(
+            String instance,
+            String text
+    ) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+
+        return repository
+                .findByInstanceAndActiveTrue(instance)
+                .stream()
+                .map(ChatbotMessage::getContent)
+                .anyMatch(text::equals);
+    }
 }

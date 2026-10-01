@@ -22,7 +22,7 @@ public class ChatbotDataInitializer
 
     @Override
     public void run(String... args) {
-        createIfNotExists(
+        upsert(
                 MessageCode.LGPD,
                 "LGPD",
                 """
@@ -32,19 +32,31 @@ public class ChatbotDataInitializer
 
                 Seus dados serão utilizados exclusivamente para o atendimento da clínica.
 
-                Se estiver de acordo, responda com:
+                Responda com o número da opção:
 
-                *1*
+                *1* - Continuar com o atendimento automático
+                *2* - Já estou falando com a clínica (encerrar o bot)
                 """
         );
 
-        createIfNotExists(
+        upsert(
                 MessageCode.LGPD_RETRY,
                 "Repetição do aceite da LGPD",
                 """
                 Para continuarmos, responda:
 
-                *1*
+                *1* - Continuar com o atendimento automático
+                *2* - Já estou falando com a clínica (encerrar o bot)
+                """
+        );
+
+        upsert(
+                MessageCode.BOT_STOPPED,
+                "Atendimento automático encerrado",
+                """
+                Tudo bem. O atendimento automático foi encerrado nesta conversa.
+
+                Nossa equipe continua disponível por aqui.
                 """
         );
 
@@ -351,5 +363,32 @@ public class ChatbotDataInitializer
         message.setActive(true);
 
         repository.save(message);
+    }
+
+    private void upsert(
+            String code,
+            String title,
+            String content
+    ) {
+        repository.findByInstanceAndCode(
+                INSTANCE,
+                code
+        ).ifPresentOrElse(
+                existing -> {
+                    existing.setTitle(title);
+                    existing.setContent(content);
+                    existing.setActive(true);
+                    repository.save(existing);
+                },
+                () -> {
+                    ChatbotMessage message = new ChatbotMessage();
+                    message.setInstance(INSTANCE);
+                    message.setCode(code);
+                    message.setTitle(title);
+                    message.setContent(content);
+                    message.setActive(true);
+                    repository.save(message);
+                }
+        );
     }
 }

@@ -28,10 +28,6 @@ public class EvolutionMessageParser {
                 .path("fromMe")
                 .asBoolean(false);
 
-        if (fromMe) {
-            return Optional.empty();
-        }
-
         String remoteJid = key
                 .path("remoteJid")
                 .asText("");
@@ -80,7 +76,8 @@ public class EvolutionMessageParser {
                         text,
                         messageId,
                         sentAt,
-                        type
+                        type,
+                        fromMe
                 )
         );
     }

@@ -9,6 +9,7 @@ public record IncomingMessageDTO(
         String text,
         String messageId,
         Instant sentAt,
-        IncomingMessageType type
+        IncomingMessageType type,
+        boolean fromMe
 ) {
 }
